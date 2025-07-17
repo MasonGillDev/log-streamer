@@ -12,15 +12,15 @@ import (
 
 const (
 	logFilePath = "/home/ubuntu/bootstrap_logs"
-	serverPort  = ":8080"
+	serverPort  = ":3333"
 )
 
 func main() {
 	http.HandleFunc("/logs/stream", streamLogs)
-	
+
 	log.Printf("Starting log streaming server on %s", serverPort)
 	log.Printf("Endpoint: http://localhost%s/logs/stream", serverPort)
-	
+
 	if err := http.ListenAndServe(serverPort, nil); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
@@ -31,13 +31,13 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	
+
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
-	
+
 	file, err := os.Open(logFilePath)
 	if err != nil {
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
@@ -45,23 +45,23 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	
+
 	info, err := file.Stat()
 	if err != nil {
 		fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 		flusher.Flush()
 		return
 	}
-	
+
 	file.Seek(0, io.SeekEnd)
-	
+
 	reader := bufio.NewReader(file)
-	
+
 	fmt.Fprintf(w, "event: connected\ndata: Streaming logs from %s\n\n", logFilePath)
 	flusher.Flush()
-	
+
 	lastSize := info.Size()
-	
+
 	for {
 		select {
 		case <-r.Context().Done():
@@ -72,7 +72,7 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				if err == io.EOF {
 					time.Sleep(100 * time.Millisecond)
-					
+
 					currentInfo, statErr := file.Stat()
 					if statErr == nil && currentInfo.Size() < lastSize {
 						log.Println("Log file was truncated, resetting position")
@@ -88,7 +88,7 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 				flusher.Flush()
 				return
 			}
-			
+
 			fmt.Fprintf(w, "data: %s\n", line)
 			flusher.Flush()
 		}
