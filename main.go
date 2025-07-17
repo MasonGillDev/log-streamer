@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -69,6 +70,7 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 			return
 		default:
 			line, err := reader.ReadString('\n')
+
 			if err != nil {
 				if err == io.EOF {
 					time.Sleep(100 * time.Millisecond)
@@ -86,6 +88,10 @@ func streamLogs(w http.ResponseWriter, r *http.Request) {
 				}
 				fmt.Fprintf(w, "event: error\ndata: %s\n\n", err.Error())
 				flusher.Flush()
+				return
+			}
+			if strings.TrimSpace(line) == "__BOOTSTRAP_DONE__" {
+				log.Println("Bootstrap complete sentinel seen, stopping stream")
 				return
 			}
 
